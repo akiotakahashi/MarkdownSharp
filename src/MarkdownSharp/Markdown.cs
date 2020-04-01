@@ -86,6 +86,7 @@ software, even if advised of the possibility of such damage.
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -351,6 +352,7 @@ namespace MarkdownSharp
         {
             text = DoHeaders(text);
             text = DoHorizontalRules(text);
+            text = DoTables(text);
             text = DoLists(text);
             text = DoCodeBlocks(text);
             text = DoBlockQuotes(text);
@@ -1118,6 +1120,164 @@ namespace MarkdownSharp
         private string DoHorizontalRules(string text)
         {
             return _horizontalRules.Replace(text, "<hr" + EmptyElementSuffix + "\n");
+        }
+
+
+        private static readonly Regex _tables = new Regex(@"
+            (?<tbl>                         # $1 = whole table
+                [ \r\n]*
+                (?<hdr>                     # $2 = table header
+                    ([^\r\n\|]*\|[^\r\n]+)  # $3
+                )
+                [ ]*\r?\n[ ]*
+                (?<col>                     # $4 = column style
+                    =?\|?([ ]*:?-+:?[ ]*(\||$))+  # $5
+                )
+                (?<row>                     # $6 = table row
+                    (                       # $7
+                        [ ]*\r?\n[ ]*
+                        ([^\r\n\|]*\|[^\r\n]+)  # $8
+                    )+
+                )
+            )",
+            RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace | RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+
+        private static readonly Regex _cell = new Regex(@"
+            \A(
+                (?<text>(`[^`]*`|[^`\|\r?\n])*)
+                (\|\r?\n?|\r?\n|\z)
+            )+?\z
+            ", RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace | RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+
+        private static readonly char[] _tableSplitChars = new[] { '|' };
+
+        /// <summary>
+        /// Turn Markdown tables into HTML table tags
+        /// </summary>
+        private string DoTables(string text)
+        {
+            // We use a different prefix before nested lists than top-level lists.
+            // See extended comment in _ProcessListItems().
+            return _tables.Replace(text, new MatchEvaluator(TableEvalutor));
+        }
+
+        private enum TextAlignment
+        {
+            Left,
+            Right,
+            Center,
+            Justify,
+        }
+
+        private string TableEvalutor(Match match)
+        {
+            var wholeTable = match.Groups["tbl"].Value;
+            var header = match.Groups["hdr"].Value.Trim();
+            var style = match.Groups["col"].Value.Trim();
+            var row = match.Groups["row"].Value.Trim();
+
+            var rowAlt = (style[0] == '=') ? true : false;
+            if (rowAlt)
+            {
+                style = style.Substring(1);
+            }
+
+            var leadingBar = header.StartsWith("|") ? '|' : '\0';
+            var tailingBar = header.EndsWith("|") ? '|' : '\0';
+            header = header.TrimStart(leadingBar).TrimEnd(tailingBar).Trim();
+            style = style.TrimStart(leadingBar).TrimEnd(tailingBar).Trim();
+            row = row.TrimStart(leadingBar).TrimEnd(tailingBar).Trim();
+
+            var styles = style.Split(_tableSplitChars, StringSplitOptions.RemoveEmptyEntries);
+            var headers = header.Split(_tableSplitChars);
+            var rowList = row.Split('\n').Select(ritm =>
+            {
+                var trimRitm = ritm.TrimStart(leadingBar).TrimEnd(tailingBar).Trim();
+                return _cell.Matches(trimRitm).Cast<Match>().SelectMany(m => m.Groups["text"].Captures.Cast<Capture>()).Select(c => c.Value).ToArray();
+            }).ToList();
+
+            int maxColCount =
+                Math.Max(
+                    Math.Max(styles.Length, headers.Length),
+                    rowList.Select(ritm => ritm.Length).Max()
+                );
+
+            // table style
+            var aligns = new List<TextAlignment?>();
+            foreach (var colStyleTxt in styles)
+            {
+                if (colStyleTxt.Length == 0) { continue; }
+                var firstChar = colStyleTxt.First();
+                var lastChar = colStyleTxt.Last();
+                // center
+                if (firstChar == ':' && lastChar == ':')
+                {
+                    aligns.Add(TextAlignment.Center);
+                }
+                // right
+                else if (lastChar == ':')
+                {
+                    aligns.Add(TextAlignment.Right);
+                }
+                // left
+                else if (firstChar == ':')
+                {
+                    aligns.Add(TextAlignment.Left);
+                }
+                // default
+                else
+                {
+                    aligns.Add(null);
+                }
+            }
+
+            while (aligns.Count < maxColCount)
+            {
+                aligns.Add(null);
+            }
+
+            // table
+            var rows = new List<string>();
+
+            // table header
+            var thead = CreateTableRow("th", headers, aligns);
+            rows.Add($"<thead>{thead}</thead>");
+
+            // table rows
+            rows.Add("<tbody>");
+            foreach (var rowAry in rowList)
+            {
+                var tbody = CreateTableRow("td", rowAry, aligns);
+                rows.Add(tbody);
+            }
+            rows.Add("</tbody>");
+
+            return $"<table>{string.Join(Environment.NewLine, rows)}</table>";
+        }
+
+        private string CreateTableRow(string tag, string[] txts, List<TextAlignment?> aligns)
+        {
+            var cells = new List<string>();
+            foreach (var idx in Enumerable.Range(0, txts.Length))
+            {
+                var txt = txts[idx].Trim();
+                var cell = RunSpanGamut(txt);
+                var align = aligns[idx];
+                if (align.HasValue)
+                {
+                    cell = $"<{tag} align='{align.ToString().ToLowerInvariant()}'>{cell}</{tag}>";
+                }
+                else
+                {
+                    cell = $"<{tag}>{cell}</{tag}>";
+                }
+                cells.Add(cell);
+            }
+            while (cells.Count < aligns.Count)
+            {
+                cells.Add($"<{tag} />");
+            }
+            return "<tr>" + string.Join(string.Empty, cells) + "</tr>";
         }
 
         private static readonly string _wholeList = string.Format(@"
