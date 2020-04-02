@@ -9,6 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MarkdownSharp.Tests", "test
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B5D82B87-4F64-4407-86C4-79FF4DFAAB91}"
 	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
 		version.json = version.json
 	EndProjectSection
 EndProject
@@ -29,5 +30,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {60759C27-461B-447F-9E76-57A03E974AE5}
 	EndGlobalSection
 EndGlobal
