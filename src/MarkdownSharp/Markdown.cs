@@ -720,7 +720,7 @@ namespace MarkdownSharp
             (<!--(?:|(?:[^>-]|-[^>])(?:[^-]|-[^-])*)-->)|        # match <!-- foo -->
             (<\?.*?\?>)|                 # match <?foo?> " +
             RepeatString(@" 
-            (<[A-Za-z\/!$](?:[^<>]|", _nestDepth - 1 ) + @" 
+            (<[A-Za-z\/!$](?:[^<>]|", _nestDepth - 1) + @" 
             (<[A-Za-z\/!$](?:[^<>]"
             + RepeatString(")*>)", _nestDepth) +
                                        " # match <tag> and </tag>",
@@ -1766,7 +1766,7 @@ namespace MarkdownSharp
             return _outDent.Replace(block, "");
         }
 
-#region Encoding and Normalization
+        #region Encoding and Normalization
 
         /// <summary>
         /// encodes email address randomly  
@@ -1960,7 +1960,7 @@ namespace MarkdownSharp
             return output.Append("\n\n").ToString();
         }
 
-#endregion
+        #endregion
 
         /// <summary>
         /// this is to emulate what's evailable in PHP
