@@ -354,7 +354,8 @@ namespace MarkdownSharp
             text = DoHorizontalRules(text);
             text = DoTables(text);
             text = DoLists(text);
-            text = DoCodeBlocks(text);
+            text = DoQuotedCodeBlocks(text);
+            text = DoIndentedCodeBlocks(text);
             text = DoBlockQuotes(text);
 
             // We already ran HashHTMLBlocks() before, in Markdown(), but that
@@ -1419,7 +1420,7 @@ namespace MarkdownSharp
         /// <summary>
         /// /// Turn Markdown 4-space indented code into HTML pre code blocks
         /// </summary>
-        private string DoCodeBlocks(string text)
+        private string DoIndentedCodeBlocks(string text)
         {
             return _codeBlock.Replace(text, new MatchEvaluator(CodeBlockEvaluator));
         }
@@ -1431,6 +1432,31 @@ namespace MarkdownSharp
             codeBlock = EncodeCode(Outdent(codeBlock));
             codeBlock = _newlinesLeadingTrailing.Replace(codeBlock, "");
 
+            return string.Concat("\n\n<pre><code>", codeBlock, "\n</code></pre>\n\n");
+        }
+
+        private static readonly Regex _quotedCcodeBlock = new Regex(@"
+                    (?<=\n)          # Character before opening
+                    [ \r\n]*
+                    (```)            # $1 = Opening run of `
+                    ([^\r\n`]*)      # $2 = The code lang
+                    \r?\n
+                    ((.|\n)+?)       # $3 = The code block
+                    \n[ ]*
+                    \1
+                    (?!`)[\r\n]+", RegexOptions.IgnorePatternWhitespace | RegexOptions.Multiline | RegexOptions.Compiled);
+
+        /// <summary>
+        /// /// Turn Markdown quoted code into HTML pre code blocks
+        /// </summary>
+        private string DoQuotedCodeBlocks(string text)
+        {
+            return _quotedCcodeBlock.Replace(text, new MatchEvaluator(QuotedCodeBlockEvaluator));
+        }
+
+        private string QuotedCodeBlockEvaluator(Match match)
+        {
+            string codeBlock = match.Groups[3].Value;
             return string.Concat("\n\n<pre><code>", codeBlock, "\n</code></pre>\n\n");
         }
 
